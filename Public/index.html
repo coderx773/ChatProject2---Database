@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Info App</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      font-size: 1em;
+    }
+    h2 {
+      margin-top: 30px;
+    }
+    .result, .message {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .message {
+      background-color: #e6f7ff;
+      border: 1px solid #91d5ff;
+    }
+    .result {
+      background-color: #f6ffed;
+      border: 1px solid #b7eb8f;
+    }
+  </style>
+</head>
+<body>
+  <h1>User Info App</h1>
+  <p><a href="table.html">View User Table Page →</a></p>
+
+  <h2>Add User</h2>
+  <form id="addForm">
+    <input type="text" id="name" placeholder="Name" required />
+    <input type="number" id="age" placeholder="Age" required />
+    <input type="number" id="height" placeholder="Height (cm)" required />
+    <button type="submit">Save User</button>
+    <div class="message" id="addMessage"></div>
+  </form>
+
+  <h2>Search User</h2>
+  <input type="text" id="searchName" placeholder="Enter name to search" />
+  <button onclick="searchUser()">Search</button>
+  <div class="result" id="searchResult"></div>
+
+  <h2>All Users</h2>
+  <div id="userList"></div>
+
+  <script>
+    // Handle form submission
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const age = document.getElementById("age").value;
+      const height = document.getElementById("height").value;
+
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, age, height }),
+      });
+
+      const messageBox = document.getElementById("addMessage");
+      if (response.ok) {
+        messageBox.textContent = "User saved successfully!";
+      } else {
+        const error = await response.text();
+        messageBox.textContent = "Error: " + error;
+      }
+
+      // Clear fields
+      document.getElementById("addForm").reset();
+      loadUsers();
+    });
+
+    // Handle search
+    async function searchUser() {
+      const name = document.getElementById("searchName").value.trim();
+      const resultBox = document.getElementById("searchResult");
+
+      if (!name) {
+        resultBox.textContent = "Please enter a name to search.";
+        return;
+      }
+
+      const response = await fetch(`/api/users/${name}`);
+
+      if (response.ok) {
+        const user = await response.json();
+        resultBox.innerHTML = `
+          <strong>Name:</strong> ${user.name}<br>
+          <strong>Age:</strong> ${user.age}<br>
+          <strong>Height:</strong> ${user.height} cm
+        `;
+      } else {
+        resultBox.textContent = "User not found.";
+      }
+    }
+
+    async function loadUsers() {
+      const res = await fetch("/api/users");
+      const users = await res.json();
+
+      const userList = document.getElementById("userList");
+      if (!users.length) {
+        userList.innerHTML = "<p>No users found.</p>";
+        return;
+      }
+
+      userList.innerHTML = users.map(user => `
+        <div style="margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+          <strong>${user.name}</strong> (Age: ${user.age}, Height: ${user.height} cm)
+          <br>
+          Created: ${user.created_at || "N/A"}<br>
+          Updated: ${user.updated_at || "N/A"}
+          <br>
+          <button onclick="editUser('${user.name}')">Edit</button>
+          <button onclick="deleteUser('${user.name}')">Delete</button>
+        </div>
+      `).join("");
+    }
+
+    async function deleteUser(name) {
+      const res = await fetch(`/api/users/${name}`, { method: "DELETE" });
+      if (res.ok) {
+        alert(`User ${name} deleted.`);
+        loadUsers();
+      } else {
+        alert("Error deleting user.");
+      }
+    }
+
+    function editUser(name) {
+      const user = prompt("Enter new age and height (comma separated):", "30,170");
+      if (!user) return;
+      const [age, height] = user.split(",");
+      fetch(`/api/users/${name}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ age: age.trim(), height: height.trim() })
+      }).then(res => {
+        if (res.ok) {
+          alert("User updated.");
+          loadUsers();
+        } else {
+          alert("Failed to update user.");
+        }
+      });
+    }
+
+    // Initial load
+    loadUsers();
+  </script>
+</body>
+</html>
